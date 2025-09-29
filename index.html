@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>S3 Car Racing Game</title>
+    <style>
+        body {
+            background-color: #333;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            /* *** IMPROVED FOR MOBILE *** */
+            overscroll-behavior: none; /* Prevents pull-to-refresh */
+            -webkit-touch-callout: none; /* Disables callout menu on long press */
+            -webkit-user-select: none;   /* Disables text selection */
+            user-select: none;
+        }
+        .game-container {
+            position: relative;
+            width: 400px;
+            max-width: 98vw; /* Ensure it fits on smaller screens */
+            height: 600px;
+            max-height: 98vh;
+            background-color: #555;
+            overflow: hidden;
+            border: 5px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            touch-action: none; /* *** IMPROVED FOR MOBILE *** */
+        }
+        .road-line {
+            position: absolute;
+            width: 10px;
+            height: 100px;
+            background-color: white;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .car, .enemy-car {
+            position: absolute;
+            width: 50px;
+            height: 80px;
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+        .car {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 180"><rect width="100" height="180" rx="20" fill="%23ff4757"/><rect x="15" y="10" width="70" height="110" fill="%23333"/><rect x="20" y="20" width="60" height="90" fill="%2374b9ff"/><rect x="10" y="130" width="20" height="30" fill="%23222"/><rect x="70" y="130" width="20" height="30" fill="%23222"/><rect x="35" y="5" width="30" height="10" fill="%23ffdd59"/><rect x="35" y="165" width="30" height="10" fill="%23ffdd59"/></svg>');
+            bottom: 20px;
+        }
+        .enemy-car {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 180"><rect width="100" height="180" rx="20" fill="%2355efc4"/><rect x="15" y="10" width="70" height="110" fill="%23333"/><rect x="20" y="20" width="60" height="90" fill="%23fdcb6e"/><rect x="10" y="130" width="20" height="30" fill="%23222"/><rect x="70" y="130" width="20" height="30" fill="%23222"/><rect x="35" y="5" width="30" height="10" fill="%23ff4757"/><rect x="35" y="165" width="30" height="10" fill="%23ff4757"/></svg>');
+        }
+        .score, .start-screen {
+            position: absolute;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 2;
+            width: 80%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            border-radius: 10px;
+        }
+        .score {
+            top: 10px;
+            padding: 10px 0;
+            font-size: 1.5em;
+        }
+        .start-screen {
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            padding: 20px 10px;
+        }
+        .start-screen h2 { margin-top: 0; }
+    </style>
+</head>
+<body>
+
+<div class="game-container" id="gameContainer">
+    <div class="score" id="score">Score: 0</div>
+    <div class="start-screen" id="startScreen">
+        <h2>Car Racing Game</h2>
+        <p>Keyboard: Use Arrow keys.</p>
+        <p>Mobile: Touch and drag to move.</p>
+        <h3>Tap to Start</h3>
+    </div>
+    <div class="car" id="playerCar"></div>
+</div>
+
+<script>
+    const gameContainer = document.getElementById('gameContainer');
+    const playerCar = document.getElementById('playerCar');
+    const scoreDisplay = document.getElementById('score');
+    const startScreen = document.getElementById('startScreen');
+
+    let gameStarted = false;
+    let score = 0;
+    let gameSpeed = 5;
+    let animationFrameId;
+
+    const player = { x: 0, speed: 10 };
+    const keys = { ArrowLeft: false, ArrowRight: false };
+
+    function isCollision(a, b) {
+        const aRect = a.getBoundingClientRect();
+        const bRect = b.getBoundingClientRect();
+        return !((aRect.bottom < bRect.top) || (aRect.top > bRect.bottom) || (aRect.right < bRect.left) || (aRect.left > bRect.right));
+    }
+
+    function moveRoadLines() {
+        document.querySelectorAll('.road-line').forEach(line => {
+            let top = line.offsetTop + gameSpeed;
+            if (top > gameContainer.offsetHeight) top = -150;
+            line.style.top = `${top}px`;
+        });
+    }
+
+    function moveEnemyCars() {
+        document.querySelectorAll('.enemy-car').forEach(enemy => {
+            if (isCollision(playerCar, enemy)) endGame();
+            
+            let top = enemy.offsetTop + gameSpeed;
+            if (top > gameContainer.offsetHeight) {
+                enemy.style.top = '-100px';
+                enemy.style.left = `${Math.floor(Math.random() * (gameContainer.offsetWidth - 50))}px`;
+                score++;
+                scoreDisplay.innerText = 'Score: ' + score;
+                if (score > 0 && score % 5 === 0) gameSpeed += 0.5;
+            } else {
+                enemy.style.top = `${top}px`;
+            }
+        });
+    }
+
+    function gameLoop() {
+        if (!gameStarted) return;
+        
+        if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+        if (keys.ArrowRight && player.x < (gameContainer.offsetWidth - playerCar.offsetWidth)) player.x += player.speed;
+        
+        playerCar.style.left = `${player.x}px`;
+
+        moveRoadLines();
+        moveEnemyCars();
+        animationFrameId = window.requestAnimationFrame(gameLoop);
+    }
+    
+    function startGame() {
+        if (gameStarted) return; // Prevent starting multiple times
+        startScreen.style.display = 'none';
+        gameStarted = true;
+        
+        // Reset game state
+        score = 0;
+        gameSpeed = 5;
+        scoreDisplay.innerText = 'Score: 0';
+        player.x = (gameContainer.offsetWidth / 2) - (playerCar.offsetWidth / 2);
+
+        document.querySelectorAll('.road-line, .enemy-car').forEach(e => e.remove());
+
+        for (let i = 0; i < 5; i++) {
+            let line = document.createElement('div');
+            line.className = 'road-line';
+            line.style.top = `${i * 150}px`;
+            gameContainer.appendChild(line);
+        }
+
+        for (let i = 0; i < 4; i++) {
+            let enemy = document.createElement('div');
+            enemy.className = 'enemy-car';
+            enemy.style.top = `${(i + 1) * -200}px`;
+            enemy.style.left = `${Math.floor(Math.random() * (gameContainer.offsetWidth - 50))}px`;
+            gameContainer.appendChild(enemy);
+        }
+
+        animationFrameId = window.requestAnimationFrame(gameLoop);
+    }
+    
+    function endGame() {
+        gameStarted = false;
+        window.cancelAnimationFrame(animationFrameId); // Stop the game loop
+        startScreen.style.display = 'block';
+        startScreen.innerHTML = `<h2>Game Over</h2><p>Your Score: ${score}</p><h3>Tap to Restart</h3>`;
+    }
+
+    // Keyboard Listeners
+    document.addEventListener('keydown', e => { if (e.key in keys) keys[e.key] = true; });
+    document.addEventListener('keyup', e => { if (e.key in keys) keys[e.key] = false; });
+
+    // *** CORRECTED: Touch & Mouse Listeners ***
+    function handleInteractionMove(e) {
+        if (!gameStarted) return;
+        // This function works for both mouse and touch
+        const gameRect = gameContainer.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let touchX = clientX - gameRect.left;
+
+        let newX = touchX - (playerCar.offsetWidth / 2);
+        
+        if (newX < 0) newX = 0;
+        if (newX > gameContainer.offsetWidth - playerCar.offsetWidth) {
+            newX = gameContainer.offsetWidth - playerCar.offsetWidth;
+        }
+        player.x = newX;
+    }
+
+    gameContainer.addEventListener('touchmove', handleInteractionMove, { passive: false });
+    gameContainer.addEventListener('mousemove', handleInteractionMove);
+    
+    // *** KEY FIX: Use touchstart for reliable mobile start ***
+    startScreen.addEventListener('click', startGame);
+    startScreen.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Prevents a "ghost click" from happening
+        startGame();
+    }, { passive: false });
+
+</script>
+</body>
+</html>
